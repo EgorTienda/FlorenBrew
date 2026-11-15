@@ -1,0 +1,16 @@
+[package]
+name = "florenbrew"
+version = "0.1.0"
+edition = "2024"
+authors = ["Egor Tienda"]
+description = "A lightweight CLI tool for downloading GitHub releases and managing systemd services."
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+ureq = { version = "2.9", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+indicatif = "0.17" # для красивого прогресс-бара при скачивании
+flate2 = "1.0"     # если нужно распаковывать tar.gz / архивы
+tar = "0.4"
+dirs = "5.0"

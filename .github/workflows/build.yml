@@ -1,0 +1,85 @@
+name: Build and Release Rust Binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '1. Версия релиза (например, 0.2.0)'
+        required: true
+        default: '0.2.0'
+      release_description:
+        description: '2. Описание релиза (changelog)'
+        required: true
+        default: 'Релиз florenbrew на Rust'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Update version in Cargo.toml
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "[*] Установка версии $VERSION в Cargo.toml..."
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+
+      - name: Build release binary
+        run: |
+          cargo build --release
+          
+          # Подготавливаем папку для артефактов
+          mkdir -p dist
+          BINARY_NAME="florenbrew"
+          ARCHIVE_NAME="florenbrew-v${{ github.event.inputs.version }}-linux-amd64.tar.gz"
+          
+          # Копируем бинарник и упаковываем в архив
+          cp target/release/$BINARY_NAME dist/
+          cd dist
+          tar -czvf "$ARCHIVE_NAME" "$BINARY_NAME"
+          rm "$BINARY_NAME"
+          ls -la
+
+      - name: Generate Checksums (SHA256)
+        run: |
+          cd dist
+          echo "[*] Генерация SHA256 хэш-сумм..."
+          for file in *; do
+            sha256sum "$file" > "${file}.sha256"
+          done
+          ls -la
+
+      - name: Prepare Release Notes
+        run: |
+          cat << EOF > release_notes.md
+          ${{ github.event.inputs.release_description }}
+
+          ---
+          ### 🚀 Установка с помощью клиента florenbrew
+          \`\`\`bash
+          florenbrew install egortienda/florenbrew
+          \`\`\`
+
+          ### 🔒 Контрольные суммы (SHA256)
+          Для проверки подлинности архива:
+          \`\`\`bash
+          sha256sum -c florenbrew-v${{ github.event.inputs.version }}-linux-amd64.tar.gz.sha256
+          \`\`\`
+          EOF
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${{ github.event.inputs.version }}"
+          name: "Florenbrew v${{ github.event.inputs.version }}"
+          body_path: "release_notes.md"
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
