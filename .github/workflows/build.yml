@@ -38,22 +38,28 @@ jobs:
           # Подготавливаем папку для артефактов
           mkdir -p dist
           BINARY_NAME="florenbrew"
-          ARCHIVE_NAME="florenbrew-v${{ github.event.inputs.version }}-linux-amd64.tar.gz"
+          VERSION="${{ github.event.inputs.version }}"
+          ARCHIVE_NAME="florenbrew-v${VERSION}-linux-amd64.tar.gz"
           
           # Копируем бинарник и упаковываем в архив
           cp target/release/$BINARY_NAME dist/
           cd dist
           tar -czvf "$ARCHIVE_NAME" "$BINARY_NAME"
           rm "$BINARY_NAME"
-          ls -la
+          
+          # Сохраняем имя архива в переменные окружения GitHub Actions
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Generate Checksums (SHA256)
         run: |
           cd dist
           echo "[*] Генерация SHA256 хэш-сумм..."
-          for file in *; do
-            sha256sum "$file" > "${file}.sha256"
-          done
+          ARCHIVE="${{ env.ARCHIVE_NAME }}"
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+          
+          # Извлекаем хэш-сумм строку и сохраняем в GITHUB_ENV
+          HASH=$(awk '{print $1}' "${ARCHIVE}.sha256")
+          echo "SHA256_HASH=$HASH" >> $GITHUB_ENV
           ls -la
 
       - name: Prepare Release Notes
@@ -67,10 +73,14 @@ jobs:
           florenbrew install egortienda/florenbrew
           \`\`\`
 
-          ### 🔒 Контрольные суммы (SHA256)
+          ### 🔒 Контрольная сумма (SHA256)
+          \`\`\`text
+          ${{ env.SHA256_HASH }}  ${{ env.ARCHIVE_NAME }}
+          \`\`\`
+
           Для проверки подлинности архива:
           \`\`\`bash
-          sha256sum -c florenbrew-v${{ github.event.inputs.version }}-linux-amd64.tar.gz.sha256
+          echo "${{ env.SHA256_HASH }}  ${{ env.ARCHIVE_NAME }}" | sha256sum -c -
           \`\`\`
           EOF
 
